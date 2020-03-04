@@ -350,7 +350,7 @@ contract IPublicLock is IERC721Enumerable {
 
   function isLockManager(address account) external view returns (bool);
 
-  function onKeySoldHook() external view returns(address);
+  function onKeyPurchaseHook() external view returns(address);
 
   function onKeyCancelHook() external view returns(address);
 
