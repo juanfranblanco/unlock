@@ -1,7 +1,9 @@
 pragma solidity 0.5.16;
 
-import '../interfaces/ILockEventHooks.sol';
+import '../interfaces/hooks/ILockKeyPurchaseHook.sol';
+import '../interfaces/hooks/ILockKeyCancelHook.sol';
 import './MixinLockCore.sol';
+import '@openzeppelin/contracts-ethereum-package/contracts/utils/Address.sol';
 
 /**
  * @title Implements callback hooks for Locks.
@@ -10,36 +12,64 @@ import './MixinLockCore.sol';
 contract MixinEventHooks is
   MixinLockCore
 {
-  ILockEventHooks public onKeySoldHook;
-  ILockEventHooks public onKeyCancelHook;
+  using Address for address;
+
+  ILockKeyPurchaseHook public onKeyPurchaseHook;
+  ILockKeyCancelHook public onKeyCancelHook;
 
   /**
    * @notice Allows a lock manager to add or remove an event hook
    */
   function setEventHooks(
-    address _onKeySoldHook,
+    address _onKeyPurchaseHook,
     address _onKeyCancelHook
   ) external
     onlyLockManager()
   {
-    onKeySoldHook = ILockEventHooks(_onKeySoldHook);
-    onKeyCancelHook = ILockEventHooks(_onKeyCancelHook);
+    require(_onKeyPurchaseHook == address(0) || _onKeyPurchaseHook.isContract(), 'INVALID_ON_KEY_SOLD_HOOK');
+    require(_onKeyCancelHook == address(0) || _onKeyCancelHook.isContract(), 'INVALID_ON_KEY_CANCEL_HOOK');
+    onKeyPurchaseHook = ILockKeyPurchaseHook(_onKeyPurchaseHook);
+    onKeyCancelHook = ILockKeyCancelHook(_onKeyCancelHook);
   }
 
   /**
    * @dev called anytime a key is sold in order to inform the hook if there is one registered.
+   * Params are from ILockKeyPurchaseHook
    */
-  function _onKeySold(
+  function _onKeyPurchase(
     address _to,
     address _referrer,
-    uint256 _pricePaid,
+    uint _keyPrice,
     bytes memory _data
   ) internal
+    returns (uint discount)
   {
-    if(address(onKeySoldHook) != address(0))
+    if(address(onKeyPurchaseHook) != address(0))
     {
-      onKeySoldHook.keySold(msg.sender, _to, _referrer, _pricePaid, _data);
+      return onKeyPurchaseHook.keyPurchase(msg.sender, _to, _referrer, _keyPrice, _data);
     }
+    return 0;
+  }
+
+  /**
+   * @notice Used to determine the purchase price before issueing a transaction.
+   * @dev Params are from ILockKeyPurchaseHook
+   * This should always return the same value that calling `keyPurchase` would.
+   * However it's possible the hook implementation is not consistent / correct.
+   */
+  function _onKeyPurchaseDiscount(
+    address _to,
+    address _referrer,
+    uint _keyPrice,
+    bytes memory _data
+  ) internal view
+    returns (uint discount)
+  {
+    if(address(onKeyPurchaseHook) != address(0))
+    {
+      return onKeyPurchaseHook.keyPurchaseDiscount(msg.sender, _to, _referrer, _keyPrice, _data);
+    }
+    return 0;
   }
 
   /**
@@ -47,7 +77,7 @@ contract MixinEventHooks is
    */
   function _onKeyCancel(
     address _to,
-    uint256 _refund
+    uint _refund
   ) internal
   {
     if(address(onKeyCancelHook) != address(0))

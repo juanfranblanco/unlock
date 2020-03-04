@@ -198,7 +198,7 @@ contract IPublicLock is IERC721Enumerable {
    * @notice Allows a lock manager to add or remove an event hook
    */
   function setEventHooks(
-    address _onKeySoldHook,
+    address _onKeyPurchaseHook,
     address _onKeyCancelHook
   ) external;
 
@@ -232,6 +232,17 @@ contract IPublicLock is IERC721Enumerable {
     address _referrer,
     bytes calldata _data
   ) external payable;
+
+  /**
+   * @notice returns the minimum price paid for a purchase with these params.
+   * @dev this considers any discount from Unlock or the OnKeyPurchase hook.
+   */
+  function purchasePriceFor(
+    address _recipient,
+    address _referrer,
+    bytes calldata _data
+  ) external view
+    returns (uint);
 
   /**
    * Allow the Lock owner to change the transfer fee.

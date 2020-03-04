@@ -78,34 +78,69 @@ contract MixinPurchase is
       emit RenewKeyPurchase(_recipient, newTimeStamp);
     }
 
-    // Let's get the actual price for the key from the Unlock smart contract
-    uint discount;
-    uint tokens;
     uint inMemoryKeyPrice = keyPrice;
-    (discount, tokens) = unlockProtocol.computeAvailableDiscountFor(_recipient, inMemoryKeyPrice);
 
+    uint discount = _onKeyPurchase(_recipient, _referrer, inMemoryKeyPrice, _data);
     if (discount > inMemoryKeyPrice) {
       inMemoryKeyPrice = 0;
     } else {
       // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
       inMemoryKeyPrice -= discount;
-    }
 
-    if (discount > 0) {
-      unlockProtocol.recordConsumedDiscount(discount, tokens);
-    }
+      uint tokens;
+      (discount, tokens) = unlockProtocol.computeAvailableDiscountFor(_recipient, inMemoryKeyPrice);
+      if (discount > inMemoryKeyPrice) {
+        discount = inMemoryKeyPrice;
+      }
 
-    unlockProtocol.recordKeyPurchase(inMemoryKeyPrice, getHasValidKey(_referrer) ? _referrer : address(0));
+      // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
+      inMemoryKeyPrice -= discount;
+
+      if (discount > 0) {
+        unlockProtocol.recordConsumedDiscount(discount, tokens);
+      }
+    }
 
     // We explicitly allow for greater amounts of ETH or tokens to allow 'donations'
     if(tokenAddress != address(0)) {
       require(_value >= inMemoryKeyPrice, 'INSUFFICIENT_VALUE');
       inMemoryKeyPrice = _value;
     }
-    // Security: after state changes to minimize risk of re-entrancy
-    uint pricePaid = _chargeAtLeast(inMemoryKeyPrice);
 
-    // Security: last line to minimize risk of re-entrancy
-    _onKeySold(_recipient, _referrer, pricePaid, _data);
+    unlockProtocol.recordKeyPurchase(inMemoryKeyPrice, getHasValidKey(_referrer) ? _referrer : address(0));
+
+    _chargeAtLeast(inMemoryKeyPrice);
+  }
+
+  /**
+   * @notice returns the minimum price paid for a purchase with these params.
+   * @dev this considers any discount from Unlock or the OnKeyPurchase hook.
+   */
+  function purchasePriceFor(
+    address _recipient,
+    address _referrer,
+    bytes calldata _data
+  ) external view
+    returns (uint)
+  {
+    uint inMemoryKeyPrice = keyPrice;
+
+    uint discount = _onKeyPurchaseDiscount(_recipient, _referrer, inMemoryKeyPrice, _data);
+    if (discount > inMemoryKeyPrice) {
+      inMemoryKeyPrice = 0;
+    } else {
+      // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
+      inMemoryKeyPrice -= discount;
+
+      (discount, ) = unlockProtocol.computeAvailableDiscountFor(_recipient, inMemoryKeyPrice);
+      if (discount > inMemoryKeyPrice) {
+        inMemoryKeyPrice = 0;
+      } else {
+        // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
+        inMemoryKeyPrice -= discount;
+      }
+    }
+
+    return inMemoryKeyPrice;
   }
 }

@@ -1,19 +1,20 @@
 pragma solidity 0.5.16;
 
-import '../interfaces/ILockEventHooks.sol';
+import '../interfaces/hooks/ILockKeyPurchaseHook.sol';
+import '../interfaces/hooks/ILockKeyCancelHook.sol';
 
 /**
  * @title Test contract for lock event hooks.
  * @author Nick Mancuso (unlock-protocol.com)
  */
-contract TestEventHooks is ILockEventHooks
+contract TestEventHooks is ILockKeyPurchaseHook, ILockKeyCancelHook
 {
-  event OnKeySold(
+  event OnKeyPurchase(
     address lock,
     address from,
     address to,
     address referrer,
-    uint pricePaid,
+    uint keyPrice,
     bytes data
   );
   event OnKeyCancel(
@@ -23,15 +24,38 @@ contract TestEventHooks is ILockEventHooks
     uint refund
   );
 
-  function keySold(
+  uint public discount;
+
+  function setDiscount(
+    uint _discount
+  ) public
+  {
+    discount = _discount;
+  }
+
+  function keyPurchase(
     address from,
     address to,
     address referrer,
-    uint pricePaid,
+    uint keyPrice,
     bytes calldata data
   ) external
+    returns (uint)
   {
-    emit OnKeySold(msg.sender, from, to, referrer, pricePaid, data);
+    emit OnKeyPurchase(msg.sender, from, to, referrer, keyPrice, data);
+    return discount;
+  }
+
+  function keyPurchaseDiscount(
+    address /*from*/,
+    address /*to*/,
+    address /*referrer*/,
+    uint /*keyPrice*/,
+    bytes calldata /*data*/
+  ) external view
+    returns (uint)
+  {
+    return discount;
   }
 
   function keyCancel(
