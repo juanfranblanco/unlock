@@ -81,7 +81,7 @@ contract MixinPurchase is
     uint inMemoryKeyPrice = keyPrice;
 
     uint discount = _onKeyPurchase(_recipient, _referrer, inMemoryKeyPrice, _data);
-    if (discount > inMemoryKeyPrice) {
+    if (discount >= inMemoryKeyPrice) {
       inMemoryKeyPrice = 0;
     } else {
       // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
@@ -89,7 +89,7 @@ contract MixinPurchase is
 
       uint tokens;
       (discount, tokens) = unlockProtocol.computeAvailableDiscountFor(_recipient, inMemoryKeyPrice);
-      if (discount > inMemoryKeyPrice) {
+      if (discount >= inMemoryKeyPrice) {
         discount = inMemoryKeyPrice;
       }
 
@@ -101,13 +101,14 @@ contract MixinPurchase is
       }
     }
 
+    // Record price without any tips
+    unlockProtocol.recordKeyPurchase(inMemoryKeyPrice, getHasValidKey(_referrer) ? _referrer : address(0));
+
     // We explicitly allow for greater amounts of ETH or tokens to allow 'donations'
     if(tokenAddress != address(0)) {
       require(_value >= inMemoryKeyPrice, 'INSUFFICIENT_VALUE');
       inMemoryKeyPrice = _value;
     }
-
-    unlockProtocol.recordKeyPurchase(inMemoryKeyPrice, getHasValidKey(_referrer) ? _referrer : address(0));
 
     _chargeAtLeast(inMemoryKeyPrice);
   }
@@ -126,14 +127,14 @@ contract MixinPurchase is
     uint inMemoryKeyPrice = keyPrice;
 
     uint discount = _onKeyPurchaseDiscount(_recipient, _referrer, inMemoryKeyPrice, _data);
-    if (discount > inMemoryKeyPrice) {
+    if (discount >= inMemoryKeyPrice) {
       inMemoryKeyPrice = 0;
     } else {
       // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
       inMemoryKeyPrice -= discount;
 
       (discount, ) = unlockProtocol.computeAvailableDiscountFor(_recipient, inMemoryKeyPrice);
-      if (discount > inMemoryKeyPrice) {
+      if (discount >= inMemoryKeyPrice) {
         inMemoryKeyPrice = 0;
       } else {
         // SafeSub not required as the if statement already confirmed `inMemoryKeyPrice - discount` cannot underflow
